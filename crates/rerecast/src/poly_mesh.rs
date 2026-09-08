@@ -249,7 +249,8 @@ impl ContourSet {
 
         let temp_poly_index = max_verts_per_cont * nvp;
 
-        for cont in &self.contours {
+        #[cfg_attr(not(feature = "tracing"), allow(unused_variables))]
+        for (contour_index, cont) in self.contours.iter().enumerate() {
             // Skip null contours.
             if cont.vertices.len() < 3 {
                 continue;
@@ -269,7 +270,28 @@ impl ContourSet {
                 Ok(ntris) => ntris,
                 Err(_) => {
                     #[cfg(feature = "tracing")]
-                    tracing::warn!("Bad triangulation, skipping contour");
+                    {
+                        let n = cont.vertices.len().max(1) as f32;
+                        let sum = cont
+                            .vertices
+                            .iter()
+                            .fold(glam::Vec3::ZERO, |acc, (v, _)| acc + v.as_vec3());
+                        let mean = sum / n;
+                        let world_center = self.aabb.min
+                            + glam::Vec3::new(
+                                mean.x * self.cell_size,
+                                mean.y * self.cell_height,
+                                mean.z * self.cell_size,
+                            );
+                        tracing::warn!(
+                            "Bad triangulation, skipping contour #{contour_index} \
+                             (region={:?}, area={:?}, vertices={}, approx_world_center={:?})",
+                            cont.region,
+                            cont.area,
+                            cont.vertices.len(),
+                            world_center,
+                        );
+                    }
                     0
                 }
             };
