@@ -261,8 +261,18 @@ impl ContourSet {
                 indices[j] = j;
             }
 
-            // Jan: we treat an invalid triangulation as an error instead of a warning.
-            let ntris = triangulate(cont.vertices.len(), &cont.vertices, &mut indices, &mut tris)?;
+            // Matches upstream recastnavigation's RecastMesh.cpp: a bad triangulation only
+            // discards this one contour (skipped below via the npolys == 0 check), instead of
+            // aborting the entire navmesh build.
+            let ntris = match triangulate(cont.vertices.len(), &cont.vertices, &mut indices, &mut tris)
+            {
+                Ok(ntris) => ntris,
+                Err(_) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!("Bad triangulation, skipping contour");
+                    0
+                }
+            };
             // Add and merge vertices.
             for j in 0..cont.vertices.len() {
                 let (v, region) = &cont.vertices[j];
